@@ -2428,6 +2428,12 @@ pub trait GenerationRequest: Send + Sync {
     fn extract_program_identity_payload(&self) -> Option<serde_json::Value> {
         None
     }
+
+    /// Body level session affinity key, used only when no session header is
+    /// present (for example anthropic `metadata.user_id`).
+    fn affinity_user_key(&self) -> Option<&str> {
+        None
+    }
 }
 
 fn program_identity_payload(

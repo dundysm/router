@@ -14,6 +14,7 @@ use crate::program_scheduling::{
     BackendObservationProvider, ProgramIdentity, ProgramScheduler, ProgramSchedulerConfig,
     ProgramTarget, ScheduleError, VllmMetricsObservationProvider,
 };
+use crate::protocols::anthropic::MessagesRequest;
 use crate::protocols::spec::{
     ChatCompletionRequest, CompletionRequest, EmbeddingRequest, GenerateRequest, GenerationRequest,
     InferenceGenerateRequest, RerankRequest, RerankResponse, RerankResult, ResponsesRequest,
@@ -1204,6 +1205,7 @@ impl Router {
     }
 
     /// Select worker for a specific model considering circuit breaker state
+    #[cfg(test)]
     fn select_worker_for_model(
         &self,
         model_id: Option<&str>,
@@ -1212,6 +1214,40 @@ impl Router {
         token_ids: Option<&[u32]>,
         lora_name: Option<&str>,
         cache_salt: Option<&str>,
+    ) -> Option<SelectedWorker> {
+        self.select_worker_for_model_with_affinity(
+            model_id, text, headers, token_ids, lora_name, cache_salt, None,
+        )
+    }
+
+    /// Add a body level affinity key (for example anthropic
+    /// `metadata.user_id`) to the policy view of the headers, only when no
+    /// session header is present. Headers always win, and nothing is added
+    /// to the headers forwarded to the worker.
+    pub(crate) fn apply_affinity_key(
+        request_headers: Option<crate::policies::RequestHeaders>,
+        affinity_key: Option<&str>,
+    ) -> Option<crate::policies::RequestHeaders> {
+        let Some(key) = affinity_key else {
+            return request_headers;
+        };
+        let mut map = request_headers.unwrap_or_default();
+        if crate::policies::hash_key::extract_hash_key_from_headers(&map).is_none() {
+            map.insert("x-user-id".to_string(), key.to_string());
+        }
+        Some(map)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn select_worker_for_model_with_affinity(
+        &self,
+        model_id: Option<&str>,
+        text: Option<&str>,
+        headers: Option<&HeaderMap>,
+        token_ids: Option<&[u32]>,
+        lora_name: Option<&str>,
+        cache_salt: Option<&str>,
+        affinity_key: Option<&str>,
     ) -> Option<SelectedWorker> {
         // Get workers for the specified model (O(1) lookup if model_id is provided)
         let workers = match model_id {
@@ -1235,7 +1271,8 @@ impl Router {
         };
 
         // Convert headers for policies that need them (e.g., consistent_hash)
-        let request_headers = Self::headers_to_request_headers(headers);
+        let request_headers =
+            Self::apply_affinity_key(Self::headers_to_request_headers(headers), affinity_key);
 
         let (idx, kv_receipt) = if let Some(kv_aware) = kv_aware_ops(policy.as_ref()) {
             let receipt = kv_aware
@@ -1361,7 +1398,7 @@ impl Router {
                     });
                     Some(SelectedWorker { worker, kv_receipt })
                 } else {
-                    self.select_worker_for_model(
+                    self.select_worker_for_model_with_affinity(
                         model_id,
                         Some(&text),
                         headers,
@@ -1370,6 +1407,7 @@ impl Router {
                             .map(|prepared| prepared.tokenized.token_ids.as_ref()),
                         lora_name,
                         cache_salt,
+                        typed_req.affinity_user_key(),
                     )
                 };
                 let SelectedWorker { worker, kv_receipt } = match selected_worker {
@@ -2483,6 +2521,16 @@ impl RouterTrait for Router {
     async fn cancel_response(&self, headers: Option<&HeaderMap>, response_id: &str) -> Response {
         let endpoint = format!("v1/responses/{}/cancel", response_id);
         self.route_post_empty_request(headers, &endpoint).await
+    }
+
+    async fn route_messages(
+        &self,
+        headers: Option<&HeaderMap>,
+        body: &MessagesRequest,
+        model_id: Option<&str>,
+    ) -> Response {
+        self.route_typed_request(headers, body, "/v1/messages", model_id)
+            .await
     }
 
     async fn route_embeddings(
