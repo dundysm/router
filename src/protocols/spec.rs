@@ -2501,7 +2501,7 @@ pub trait GenerationRequest: Send + Sync {
     }
 }
 
-fn program_identity_payload(
+pub(crate) fn program_identity_payload(
     other: &serde_json::Map<String, serde_json::Value>,
     user: Option<&str>,
 ) -> Option<serde_json::Value> {
