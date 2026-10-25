@@ -1744,17 +1744,41 @@ impl Router {
         // Copy all headers from original request if provided, skipping
         // Content-Type/Content-Length (.json() sets them) and trace headers
         // (propagate_trace_headers below injects fresh context).
+        // On `/v1/messages` also drop hop-by-hop headers (so proxy credentials
+        // never reach workers) and let a configured worker api_key win over
+        // the client's Authorization, matching route_transparent.
+        let is_messages = route == "/v1/messages";
+        let worker_key = if is_messages {
+            self.api_key.as_deref()
+        } else {
+            None
+        };
         if let Some(headers) = headers {
+            let connection_listed = if is_messages {
+                header_utils::connection_listed_headers(headers)
+            } else {
+                Vec::new()
+            };
             for (name, value) in headers {
                 if *name != CONTENT_TYPE
                     && *name != CONTENT_LENGTH
                     && !header_utils::TRACE_HEADER_NAMES
                         .iter()
                         .any(|&th| name.as_str().eq_ignore_ascii_case(th))
+                    && !(is_messages
+                        && (*name == http::header::HOST
+                            || header_utils::is_hop_by_hop_request_header(
+                                name.as_str(),
+                                &connection_listed,
+                            )))
+                    && !(worker_key.is_some() && *name == http::header::AUTHORIZATION)
                 {
                     request_builder = request_builder.header(name, value);
                 }
             }
+        }
+        if let Some(key) = worker_key {
+            request_builder = request_builder.header("Authorization", format!("Bearer {}", key));
         }
 
         // Add X-data-parallel-rank header for DP-aware routing

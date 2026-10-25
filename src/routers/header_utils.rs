@@ -54,6 +54,44 @@ fn should_forward_header(name: &str) -> bool {
     )
 }
 
+/// Hop-by-hop request headers (RFC 9110 section 7.6.1) that a proxy must not
+/// forward to the next hop.
+const HOP_BY_HOP_REQUEST_HEADERS: &[&str] = &[
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "proxy-connection",
+    "te",
+    "trailer",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+];
+
+/// Lowercased header names listed in every `Connection` value of `headers`.
+pub fn connection_listed_headers(headers: &HeaderMap) -> Vec<String> {
+    headers
+        .get_all(axum::http::header::CONNECTION)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .map(|t| t.trim().to_ascii_lowercase())
+        .filter(|t| !t.is_empty())
+        .collect()
+}
+
+/// True when `name` is a hop-by-hop request header, either a fixed one or one
+/// named by the request's `Connection` header (`connection_listed`).
+pub fn is_hop_by_hop_request_header(name: &str, connection_listed: &[String]) -> bool {
+    HOP_BY_HOP_REQUEST_HEADERS
+        .iter()
+        .any(|h| name.eq_ignore_ascii_case(h))
+        || connection_listed
+            .iter()
+            .any(|h| name.eq_ignore_ascii_case(h))
+}
+
 /// Propagate OpenTelemetry trace headers to a reqwest RequestBuilder
 ///
 /// When OTel is enabled: actively injects the current span's trace context,
@@ -126,5 +164,27 @@ mod tests {
 
         assert_eq!(result.len(), 1);
         assert_eq!(result["content-type"], "application/json");
+    }
+
+    #[test]
+    fn test_hop_by_hop_request_headers_include_connection_listed() {
+        let mut headers = HeaderMap::new();
+        headers.append("connection", "keep-alive, X-Secret".parse().unwrap());
+        headers.append("connection", "x-other".parse().unwrap());
+        let listed = connection_listed_headers(&headers);
+        assert_eq!(listed, vec!["keep-alive", "x-secret", "x-other"]);
+        for name in [
+            "Connection",
+            "Proxy-Authorization",
+            "TE",
+            "Trailer",
+            "Upgrade",
+            "x-secret",
+            "X-Other",
+        ] {
+            assert!(is_hop_by_hop_request_header(name, &listed), "{name}");
+        }
+        assert!(!is_hop_by_hop_request_header("authorization", &listed));
+        assert!(!is_hop_by_hop_request_header("x-session-id", &listed));
     }
 }
