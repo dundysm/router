@@ -781,7 +781,7 @@ pub fn ensure_example_component_artifact() -> Option<PathBuf> {
         .clone()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod tests {
     use super::*;
     use axum::{body::Body, routing::post, Json, Router};

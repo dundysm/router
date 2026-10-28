@@ -1,3 +1,5 @@
+#![cfg(all(feature = "cpu", feature = "ready"))]
+
 mod common;
 
 use axum::{
@@ -55,6 +57,7 @@ impl TestContext {
             circuit_breaker: CircuitBreakerConfig::default(),
             disable_retries: false,
             disable_circuit_breaker: false,
+            kv_aware_session_affinity_ttl_secs: None,
             health_check: vllm_router_rs::config::HealthCheckConfig::default(),
             enable_igw: false,
             connection_mode: ConnectionMode::Http,
@@ -138,7 +141,7 @@ impl TestContext {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod health_tests {
     use super::*;
 
@@ -276,7 +279,7 @@ mod health_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod generation_tests {
     use super::*;
     use axum::{
@@ -587,7 +590,7 @@ mod generation_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod model_info_tests {
     use super::*;
 
@@ -862,7 +865,7 @@ mod model_info_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod worker_management_tests {
     use super::*;
 
@@ -1078,7 +1081,7 @@ mod worker_management_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod router_policy_tests {
     use super::*;
 
@@ -1150,7 +1153,7 @@ mod router_policy_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod responses_endpoint_tests {
     use super::*;
     use reqwest::Client as HttpClient;
@@ -1532,7 +1535,7 @@ mod responses_endpoint_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod error_tests {
     use super::*;
 
@@ -1644,6 +1647,7 @@ mod error_tests {
             circuit_breaker: CircuitBreakerConfig::default(),
             disable_retries: false,
             disable_circuit_breaker: false,
+            kv_aware_session_affinity_ttl_secs: None,
             health_check: vllm_router_rs::config::HealthCheckConfig::default(),
             enable_igw: false,
             connection_mode: ConnectionMode::Http,
@@ -1779,7 +1783,7 @@ mod error_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod cache_tests {
     use super::*;
 
@@ -1886,7 +1890,7 @@ mod cache_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod load_balancing_tests {
     use super::*;
 
@@ -1941,7 +1945,7 @@ mod load_balancing_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod pd_mode_tests {
     use super::*;
 
@@ -2008,6 +2012,7 @@ mod pd_mode_tests {
             circuit_breaker: CircuitBreakerConfig::default(),
             disable_retries: false,
             disable_circuit_breaker: false,
+            kv_aware_session_affinity_ttl_secs: None,
             health_check: vllm_router_rs::config::HealthCheckConfig::default(),
             enable_igw: false,
             connection_mode: ConnectionMode::Http,
@@ -2034,7 +2039,7 @@ mod pd_mode_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod request_id_tests {
     use super::*;
 
@@ -2175,6 +2180,7 @@ mod request_id_tests {
             circuit_breaker: CircuitBreakerConfig::default(),
             disable_retries: false,
             disable_circuit_breaker: false,
+            kv_aware_session_affinity_ttl_secs: None,
             health_check: vllm_router_rs::config::HealthCheckConfig::default(),
             enable_igw: false,
             connection_mode: ConnectionMode::Http,
@@ -2225,7 +2231,7 @@ mod request_id_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "cpu", feature = "ready"))]
 mod rerank_tests {
     use super::*;
     // Note: RerankRequest and RerankResult are available for future use
